@@ -41,4 +41,11 @@ interface Environment
      * @return list<\Rubix\ML\ReinforcementLearning\ObservationType>
      */
     public function observationSpace(): ObservationType;
+
+    /**
+     * Print the environment to the screen or to a file.
+     * 
+     * @param ?file $path
+     */
+    public function show(?string $path = null) : void;
 }

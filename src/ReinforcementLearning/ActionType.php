@@ -52,7 +52,8 @@ class ActionType
      * @param int $type
      * @param list<string>|list<float>|list<ActionType> $params
      */
-    public function __construct(int $type, mixed $params) {
+    public function __construct(int $type, mixed $params)
+    {
         $this->type = $type;
         //TODO: verify types of params
         $this->params = $params;
@@ -76,5 +77,17 @@ class ActionType
     public function params() : mixed
     {
         return $this->params;
+    }
+
+    /**
+     * Verify that an action belongs in this action space.
+     *
+     * @param Action $action
+     * @return bool
+     */
+    public function contains(Action $action) : bool
+    {
+        //TODO
+        return true;
     }
 } 

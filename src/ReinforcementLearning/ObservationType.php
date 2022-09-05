@@ -77,4 +77,16 @@ class ObservationType
     {
         return $this->params;
     }
+    
+    /**
+     * Verify that an observation belongs in this observation space.
+     *
+     * @param Observation $observation
+     * @return bool
+     */
+    public function contains(Observation $observation) : bool
+    {
+        //TODO
+        return true;
+    }
 } 

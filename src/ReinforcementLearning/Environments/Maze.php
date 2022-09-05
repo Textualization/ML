@@ -11,6 +11,8 @@ use Rubix\ML\ReinforcementLearning\Observation;
 use Rubix\ML\ReinforcementLearning\SimpleObservation;
 use Rubix\ML\ReinforcementLearning\CompositeObservation;
 
+use function file_put_contents;
+
 /**
  * Sample environment with a 2D-maze
  *
@@ -238,21 +240,27 @@ class Maze implements Environment
     /**
      * Print maze to screen.
      */
-    public function show() : void
+    public function show(?string $path = null) : void
     {
+        $s = "";
         for($i=0; $i<$this->height; $i++) {
             for($j=0; $j<$this->width; $j++) {
                 if($this->current[0] == $i && $this->current[1] == $j){
-                    echo "o";
+                    $s .= "o";
                 }elseif($this->goal[0] == $i && $this->goal[1] == $j){
-                    echo "X";
+                    $s .= "X";
                 }elseif($this->maze[$i][$j]){
-                    echo "#";
+                    $s .= "#";
                 }else{
-                    echo ".";
+                    $s .= ".";
                 }
             }
-            echo "\n";
+            $s .= PHP_EOL;
+        }
+        if($path){
+            file_put_contents($path, $s);
+        }else{
+            echo $s;
         }
     }
 }
