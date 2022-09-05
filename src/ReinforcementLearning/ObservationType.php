@@ -44,7 +44,7 @@ class ObservationType
      *
      * @var list<string>|list<float>|list<ObservationType>
      */
-    protected mixed $params;
+    protected array $params;
     
     /**
      * Create an observation type
@@ -52,7 +52,7 @@ class ObservationType
      * @param int $type
      * @param list<string>|list<float>|list<ObservationType> $params
      */
-    public function __construct(int $type, mixed $params) {
+    public function __construct(int $type, array $params) {
         $this->type = $type;
         //TODO: verify types of params
         $this->params = $params;
@@ -73,7 +73,7 @@ class ObservationType
      *
      * @return list<string>|list<float>|list<ObservationType>
      */
-    public function params() : mixed
+    public function params() : array
     {
         return $this->params;
     }

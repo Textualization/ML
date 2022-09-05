@@ -44,7 +44,7 @@ class ActionType
      *
      * @var list<string>|list<float>|list<ActionType>
      */
-    protected mixed $params;
+    protected array $params;
 
     /**
      * Create an action type
@@ -52,7 +52,7 @@ class ActionType
      * @param int $type
      * @param list<string>|list<float>|list<ActionType> $params
      */
-    public function __construct(int $type, mixed $params)
+    public function __construct(int $type, array $params)
     {
         $this->type = $type;
         //TODO: verify types of params
@@ -74,7 +74,7 @@ class ActionType
      *
      * @return list<string>|list<float>|list<ActionType>
      */
-    public function params() : mixed
+    public function params() : array
     {
         return $this->params;
     }
