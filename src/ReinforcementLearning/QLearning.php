@@ -9,7 +9,7 @@ namespace Rubix\ML\ReinforcementLearning;
  * @package     Rubix/ML
  * @author      Pablo Duboue
  */
-class QLearning
+class QLearning extends TemporalDifferencesLearning
 {
 
     /**
@@ -27,20 +27,6 @@ class QLearning
     protected int $numActions;
     
     /**
-     * Possible actions.
-     *
-     * @var ActionType
-     */
-    protected ActionType $actionSpace;
-
-    /**
-     * Possible states.
-     *
-     * @var ObservationType
-     */
-    protected ObservationType $observationSpace;
-        
-    /**
      * The Q-table
      *
      * @var list<list<float>>
@@ -48,15 +34,18 @@ class QLearning
     protected array $qtable;
     
     /**
-     * Create a Q-Learning instance for a given Environment.
+     * Create a Q-Learning instance for a given Environment. The environments has to have discrete actions and observations.
+     * 
+     * @param Environment
+     * @param float $gamma controls whether immediate or future rewards are more important (zero means only immediate rewards matter)
+     * @param float $epsilon controls whether suboptimal actions will be taken to explore the space (zero means only optimal actions taken, leads to local optimum)
      */
-    public function __construct(Environment $env, float $gamma)
+    public function __construct(Environment $env, float $gamma, float $epsilon)
     {
+        parent::__construct($env, $gamma, $epsilon);
         //TODO validate action space is discrete
-        $this->actionSpace = $env->actionSpace();
         $this->numActions = count($this->actionSpace->params());
         //TODO validate observation space is discrete
-        $this->observationSpace = $env->observationSpace();
         if($this->observationSpace->type() == ObservationType::COMPOSITE) {
             $this->numStates = 1;
             foreach($this->observationSpace->params() as $obs){
@@ -73,7 +62,6 @@ class QLearning
             }
             $this->qtable[] = $row;
         }
-        $this->gamma = $gamma;
     }
 
     /**
@@ -102,44 +90,63 @@ class QLearning
     }
 
     /**
-     * Train one episode against a given environment.
-     *
-     * @param Environmnet $env
+     * Update an expected value for a given observation/action pair.
+     * It includes a learning rate.
+     * @param Observation
+     * @param Action
+     * @param float $learningRate
+     * @param float $value
      */
-    public function trainEpisode(Environment $env) : void
+    protected function updateValue(Observation $observation, Action $action, float $learningRate, float $value) : void
     {
-        $response = $env->reset();
-        $current = $this->observationToState($response->observation());
-        while(! $response->finished()) {
-            $nextAction = mt_rand(0, $this->numActions);
-            $response = $env->step(new DiscreteAction($nextAction, $this->actionSpace));
-            $nextState = $this->observationToState($response->observation());
-            $maxQ = -999999;
-            for($i=0;$i<$this->numActions;$i++){
-                $maxQ = max($maxQ, $this->qtable[$nextState][$i]);
-            }
-            $this->qtable[$current][$nextAction] = $response->reward() + $this->gamma * $maxQ;
-            $current = $nextState;
-        }
+        $state = $this->observationToState($observation);
+        $actNum = $action->value();
+        $this->qtable[$state][$actNum] *= 1.0 - $learningRate;
+        $this->qtable[$state][$actNum] = $learningRate * $value;
     }
 
     /**
-     * Use the qtable to pick the next action
-     *
+     * Find the maximum possible value for a given observation, over all possible actions.
+     * 
      * @param Observation
-     * @return Action
+     * @return float the value
      */
-    public function execute(Observation $observation) : Action
+    protected function maxValueAction(Observation $observation) : float
     {
         $state = $this->observationToState($observation);
-        $bestAction = -1;
         $bestQ = -1;
-        for($i=0;$i<$this->numActions;$i++){
-            if($bestAction == -1 || $bestQ < $this->qtable[$state][$i]) {
-                $bestAction = $i;
+        for($i=0; $i<$this->numActions; $i++) {
+            if($bestQ == -1 || $bestQ < $this->qtable[$state][$i]) {
                 $bestQ = $this->qtable[$state][$i];
             }
         }
-        return new DiscreteAction($bestAction, $this->actionSpace);
+        return $bestQ;
+    }
+
+    /**
+     * Given a state, return the action to take next. 
+     * It uses $epsilon to balance exploration vs. exploitation. 
+     * An $epsilon of 0 picks the action with highest value.
+     *
+     * @param Observation $observation
+     * @param float
+     * @return Action
+     */
+    protected function explorationPolicy(Observation $observation, float $epsilon) : Action
+    {
+        $action = -1;
+        if($epsilon > 0 && mt_rand() / mt_getrandmax() < $epsilon) {
+            $action = mt_rand(0, $this->numActions - 1);
+        }else{
+            $state = $this->observationToState($observation);
+            $bestQ = -1;
+            for($i=0; $i<$this->numActions; $i++) {
+                if($action == -1 || $bestQ < $this->qtable[$state][$i]) {
+                    $action = $i;
+                    $bestQ = $this->qtable[$state][$i];
+                }
+            }
+        }
+        return new DiscreteAction($action, $this->actionSpace);
     }
 }
