@@ -16,7 +16,7 @@ interface Action
      *
      * @return mixed
      */
-    public function value() : mixed;
+    public function value();
 
     /**
      * Action space this action belongs to.

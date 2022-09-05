@@ -28,7 +28,7 @@ class SimpleObservation implements Observation
     /**
      * Create an observation.
      */
-    public function __construct(mixed $value, ObservationType $type)
+    public function __construct($value, ObservationType $type)
     {
         $this->value = $value;
         //TODO validate type is either continuous or discrete
@@ -40,7 +40,7 @@ class SimpleObservation implements Observation
      *
      * @return float|int
      */
-    public function value() : mixed
+    public function value()
     {
         return $this->value;
     }
