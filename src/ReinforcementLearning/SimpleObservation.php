@@ -16,7 +16,7 @@ class SimpleObservation implements Observation
      *
      * @var float|int
      */
-    protected mixed $value;
+    protected $value;
 
     /**
      * The type of this observation
