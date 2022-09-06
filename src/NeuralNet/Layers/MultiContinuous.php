@@ -50,7 +50,7 @@ class MultiContinuous implements Output
      *
      * @var ?positive-int
      */
-    protected int $width = null;
+    protected ?int $width = null;
     
     /**
      * Return the width of the layer.
@@ -120,7 +120,7 @@ class MultiContinuous implements Output
                 . ' before backpropagating.');
         }
 
-        $expected = Matrix::quick([$labels]);
+        $expected = Matrix::quick($labels);
 
         $input = $this->input;
 

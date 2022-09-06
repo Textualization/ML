@@ -70,7 +70,7 @@ class MaskedLoss implements RegressionLoss
     public function compute(Matrix $output, Matrix $target) : float
     {
         
-        return $loss->compute($this->mask($output, $target), $target);
+        return $this->loss->compute($this->mask($output, $target), $target);
     }
 
     /**
@@ -84,7 +84,7 @@ class MaskedLoss implements RegressionLoss
      */
     public function differentiate(Matrix $output, Matrix $target) : Matrix
     {
-        return $loss->differentiate($this->mask($output, $target), $target);
+        return $this->loss->differentiate($this->mask($output, $target), $target);
     }
 
     /**
