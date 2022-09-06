@@ -10,16 +10,18 @@ use Rubix\ML\NeuralNet\Layers\Dense;
 use Rubix\ML\NeuralNet\Layers\Dense;
 use Rubix\ML\NeuralNet\Optimizers\Optimizer;
 use Rubix\ML\NeuralNet\ReLU;
+use Rubix\ML\NeuralNet\CostFunctions\HuberLoss;
+use Rubix\ML\NeuralNet\CostFunctions\MaskedLoss;
 
 
 /**
- * The Deep Q-Learning algorithm using actor-critic.
+ * The Deep QNetwork using actor-critic.
  *
  * @category    Machine Learning
  * @package     Rubix/ML
  * @author      Pablo Duboue
  */
-class DeepQLearning extends TemporalDifferencesLearning
+class DeepQNetwork extends TemporalDifferencesLearning
 {
 
     /**
@@ -51,7 +53,7 @@ class DeepQLearning extends TemporalDifferencesLearning
     protected Network $critic;
 
     /**
-     * Replay memory, 5-tuples <state, action, target>
+     * Replay memory, triples <state (input layer), action (int), target value (float)>
      * 
      * @var list<list<float>>
      */
@@ -101,7 +103,7 @@ class DeepQLearning extends TemporalDifferencesLearning
             $this->numInputs = count($this->observationSpace->params());  // one-hot encoded
         }
         $input = new Placeholder1D($this->numInputs);
-        $output = new MultiContinuous(new HuberLoss()),
+        $output = new MultiContinuous(new MaskedLoss(new HuberLoss())),
         $optimizer = $optimizer ?? new Adam();
         $layers = $layers ?? [ new Dense(($numInputs + $numActions) / 2),
                                new Activation(new ReLU()),
@@ -161,10 +163,7 @@ class DeepQLearning extends TemporalDifferencesLearning
         if($this->replayMemoryLastItem > $this->replayMemorySize) {
             unset($replayMemory[$replayMemoryLastItem - $this->replayMemorySize]);
         }
-        $entry = $activation;
-        $entry[] = $action->value();
-        $entry[] = $value;
-        $this->replayMemory[$this->replayMemoryLastItem] = $entry;
+        $this->replayMemory[$this->replayMemoryLastItem] = [ $activation, $action->value(), $value];
     }
 
     /**
@@ -211,5 +210,45 @@ class DeepQLearning extends TemporalDifferencesLearning
             }
         }
         return new DiscreteAction($action, $this->actionSpace);
+    }
+
+    /**
+     * Train a minibatch, returns the loss.
+     *
+     * @param int $batchSize how many entries to sample from replay memory.
+     * @return float the loss for the minibatch
+     */
+    public function trainBatch(int $batchSize) : float
+    {
+        shuffle($this->replayMemory);
+        $inputs=[];
+        $outputs=[];
+        $sample=[];
+        $count = 0;
+        foreach($this->replayMemory as $entry){
+            $output = [];
+            for($i=0; $i<$this->numActions; $i++){
+                $output[] = NAN;
+            }
+            $output[$entry[1]] = $entry[2];
+            $outputs[]= $output;
+            $entry[] = $output;
+            $sample[] = $entry;
+            $inputs[] = $entry[0];
+            $count++;
+            if($count >= $batchSize){
+                break;
+            }
+        }
+        $input = Matrix::quick($all_input)->transpose();
+        $this->critic->feed($input);
+        return $this->backpropagate($output);
+    }
+
+    /**
+     * Adopt the trained critic as a new actor.
+     */
+    public function adoptCritic() : void {
+        $this->actor = clone $this->critic;
     }
 }
