@@ -50,7 +50,7 @@ class MaskedLoss implements RegressionLoss
                 if(is_nan($val)) {
                     $res_row[] = $t[$r][$c];
                 }else{
-                    $rew_row[] = $val;
+                    $res_row[] = $val;
                 }
             }
             $result[] = $res_row;

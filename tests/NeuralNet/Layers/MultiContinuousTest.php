@@ -50,8 +50,7 @@ class MultiContinuousTest extends TestCase
         ]);
 
         $this->labels = [
-            [0.0, -2.5, 90],
-            [0.0,  1.0, 10]
+            [0.0, 0.0], [-2.5, 1.0], [90, 10]
         ];
 
         $this->optimizer = new Stochastic(0.001);

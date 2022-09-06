@@ -2,16 +2,21 @@
 
 namespace Rubix\ML\ReinforcementLearning;
 
+use Tensor\Matrix;
 use Rubix\ML\NeuralNet\Network;
 use Rubix\ML\NeuralNet\FeedForward;
 use Rubix\ML\NeuralNet\Layers\Layer;
 use Rubix\ML\NeuralNet\Layers\Input;
 use Rubix\ML\NeuralNet\Layers\Dense;
-use Rubix\ML\NeuralNet\Layers\Dense;
+use Rubix\ML\NeuralNet\Layers\Activation;
+use Rubix\ML\NeuralNet\Layers\MultiContinuous;
 use Rubix\ML\NeuralNet\Optimizers\Optimizer;
+use Rubix\ML\NeuralNet\Optimizers\Adam;
 use Rubix\ML\NeuralNet\ReLU;
 use Rubix\ML\NeuralNet\CostFunctions\HuberLoss;
+use Rubix\ML\NeuralNet\CostFunctions\LeastSquares;
 use Rubix\ML\NeuralNet\CostFunctions\MaskedLoss;
+use Rubix\ML\NeuralNet\Layers\Placeholder1D;
 
 
 /**
@@ -41,16 +46,16 @@ class DeepQNetwork extends TemporalDifferencesLearning
     /**
      * Actor network, from input neurons to numActions continuous.
      *
-     * @var 
+     * @var FeedForward
      */
-    protected array Network $actor;
+    protected FeedForward $actor;
     
     /**
      * Critic network, from input neurons to numActions continuous.
      *
-     * @var list<list<float>>
+     * @var FeedForward
      */
-    protected Network $critic;
+    protected FeedForward $critic;
 
     /**
      * Replay memory, triples <state (input layer), action (int), target value (float)>
@@ -103,13 +108,13 @@ class DeepQNetwork extends TemporalDifferencesLearning
             $this->numInputs = count($this->observationSpace->params());  // one-hot encoded
         }
         $input = new Placeholder1D($this->numInputs);
-        $output = new MultiContinuous(new MaskedLoss(new HuberLoss())),
-        $optimizer = $optimizer ?? new Adam();
-        $layers = $layers ?? [ new Dense(($numInputs + $numActions) / 2),
-                               new Activation(new ReLU()),
-                               new Dense($numActions) ];
+        $output = new MultiContinuous(new MaskedLoss(new LeastSquares())); //new HuberLoss()));
+        $optimizer = $optimizer ?? new Adam(0.001);
+        $layers = $layers ?? [ new Dense(($this->numInputs + $this->numActions) / 2),
+                               new Activation(new ReLU()) ];
+        $layers[] = new Dense($this->numActions);
         $this->actor = new Feedforward($input, $layers, $output, $optimizer);
-        $this->network->initialize();
+        $this->actor->initialize();
         $this->critic = clone $this->actor;
         $this->replayMemory = [];
         $this->replayMemoryMaxSize = 2000;
@@ -133,10 +138,10 @@ class DeepQNetwork extends TemporalDifferencesLearning
             $cols = $obs->observationSpace()->params();
             foreach($obs->value() as $coord => $val) {
                 if($cols[$coord]->type() == ObservationType::DISCRETE) {
-                    $result[$idx + $obs->value()] = 1.0;
+                    $result[$idx + $val] = 1.0;
                     $idx += count($cols[$coord]->params());
                 }else{
-                    $result[$idx] = $obs->value();
+                    $result[$idx] = $val;
                     $idx++;
                 }
             }
@@ -160,8 +165,8 @@ class DeepQNetwork extends TemporalDifferencesLearning
     {
         $activation = $this->observationToActivation($observation);
         $this->replayMemoryLastItem++;
-        if($this->replayMemoryLastItem > $this->replayMemorySize) {
-            unset($replayMemory[$replayMemoryLastItem - $this->replayMemorySize]);
+        if($this->replayMemoryLastItem > $this->replayMemoryMaxSize) {
+            unset($this->replayMemory[$this->replayMemoryLastItem - $this->replayMemoryMaxSize]);
         }
         $this->replayMemory[$this->replayMemoryLastItem] = [ $activation, $action->value(), $value];
     }
@@ -174,14 +179,9 @@ class DeepQNetwork extends TemporalDifferencesLearning
      */
     protected function maxValueAction(Observation $observation) : float
     {
-        $state = $this->observationToState($observation);
-        $bestQ = -1;
-        for($i=0; $i<$this->numActions; $i++) {
-            if($bestQ == -1 || $bestQ < $this->qtable[$state][$i]) {
-                $bestQ = $this->qtable[$state][$i];
-            }
-        }
-        return $bestQ;
+        $activation = $this->observationToActivation($observation);
+        $input = Matrix::quick([ $activation ])->transpose();
+        return $this->actor->feed($input)->max()->max();
     }
 
     /**
@@ -199,8 +199,9 @@ class DeepQNetwork extends TemporalDifferencesLearning
         if($epsilon > 0 && mt_rand() / mt_getrandmax() < $epsilon) {
             $action = mt_rand(0, $this->numActions - 1);
         }else{
-            $input = $this->observationToState($observation);
-            $output = $this->actor->infer($input);
+            $activation = $this->observationToActivation($observation);
+            $input = Matrix::quick([ $activation ])->transpose();
+            $output = $this->actor->feed($input)->asArray();
             $bestQ = -1;
             for($i=0; $i<$this->numActions; $i++) {
                 if($action == -1 || $bestQ < $output[$i]) {
@@ -223,7 +224,6 @@ class DeepQNetwork extends TemporalDifferencesLearning
         shuffle($this->replayMemory);
         $inputs=[];
         $outputs=[];
-        $sample=[];
         $count = 0;
         foreach($this->replayMemory as $entry){
             $output = [];
@@ -232,17 +232,15 @@ class DeepQNetwork extends TemporalDifferencesLearning
             }
             $output[$entry[1]] = $entry[2];
             $outputs[]= $output;
-            $entry[] = $output;
-            $sample[] = $entry;
             $inputs[] = $entry[0];
             $count++;
             if($count >= $batchSize){
                 break;
             }
         }
-        $input = Matrix::quick($all_input)->transpose();
+        $input = Matrix::quick($inputs)->transpose();
         $this->critic->feed($input);
-        return $this->backpropagate($output);
+        return $this->critic->backpropagate($outputs);
     }
 
     /**

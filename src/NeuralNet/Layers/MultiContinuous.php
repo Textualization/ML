@@ -120,7 +120,7 @@ class MultiContinuous implements Output
                 . ' before backpropagating.');
         }
 
-        $expected = Matrix::quick($labels);
+        $expected = Matrix::quick($labels)->transpose();
 
         $input = $this->input;
 
