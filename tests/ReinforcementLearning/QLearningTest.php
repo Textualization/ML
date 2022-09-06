@@ -17,7 +17,7 @@ class QLearningTest extends TestCase
      *
      * @var int
      */
-    protected const MAX_STEPS = 100;
+    protected const MAX_STEPS = 1000;
 
     /**
      * The environment over which to run the test.
@@ -63,12 +63,13 @@ class QLearningTest extends TestCase
     public function build() : void
     {
         // base system
-        $qlearning = new QLearning($this->env, 0.8, 0.9);
+        mt_srand(1);
+        $qlearning = new QLearning($this->env, 0.8, 1.0);
         $steps_at_0 = $this->stepsToSuccess($qlearning);
 
         // train 1
-        for($i=0;$i<100;$i++) {
-            $qlearning->trainEpisode($this->env, 0.05, 0.002);
+        for($i=0;$i<200;$i++) {
+            $qlearning->trainEpisode($this->env, QLearningTest::MAX_STEPS, 0.05, 0.002);
         }
         $steps_at_1 = $this->stepsToSuccess($qlearning);
         $this->assertLessThan($steps_at_0, $steps_at_1);
