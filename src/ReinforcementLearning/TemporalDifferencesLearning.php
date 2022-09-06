@@ -91,15 +91,16 @@ abstract class TemporalDifferencesLearning
      * It includes a learning rate with decay.
      *
      * @param Environmnet $env
+     * @param int $maxSteps maximum number of steps
      * @param float $learningRate
      * @param float $decay
      */
-    public function trainEpisode(Environment $env, float $learningRate, float $decay) : void
+    public function trainEpisode(Environment $env, int $maxSteps, float $learningRate, float $decay) : void
     {
         $response = $env->reset();
         $current = $response->observation();
         $steps = 0;
-        while(! $response->finished()) {
+        while(! $response->finished() && $steps < $maxSteps) {
             $nextAction = $this->explorationPolicy($current, $this->epsilon);
             $response = $env->step($nextAction);
             $maxValue = $this->maxValueAction($response->observation());
