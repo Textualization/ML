@@ -15,8 +15,9 @@ use Rubix\ML\NeuralNet\Optimizers\Adam;
 use Rubix\ML\NeuralNet\ReLU;
 use Rubix\ML\NeuralNet\CostFunctions\HuberLoss;
 use Rubix\ML\NeuralNet\CostFunctions\LeastSquares;
-use Rubix\ML\NeuralNet\CostFunctions\MaskedLoss;
 use Rubix\ML\NeuralNet\Layers\Placeholder1D;
+use Rubix\ML\NeuralNet\Initializers\Xavier2;
+use Rubix\ML\NeuralNet\Initializers\Constant;
 
 
 /**
@@ -108,11 +109,11 @@ class DeepQNetwork extends TemporalDifferencesLearning
             $this->numInputs = count($this->observationSpace->params());  // one-hot encoded
         }
         $input = new Placeholder1D($this->numInputs);
-        $output = new MultiContinuous(new MaskedLoss(new LeastSquares())); //new HuberLoss()));
+        $output = new MultiContinuous(new HuberLoss());
         $optimizer = $optimizer ?? new Adam(0.001);
         $layers = $layers ?? [ new Dense(($this->numInputs + $this->numActions) / 2),
                                new Activation(new ReLU()) ];
-        $layers[] = new Dense($this->numActions);
+        $layers[] = new Dense($this->numActions, 0.0, true, new Xavier2(), new Constant(0.1));
         $this->actor = new Feedforward($input, $layers, $output, $optimizer);
         $this->actor->initialize();
         $this->critic = clone $this->actor;
@@ -226,12 +227,7 @@ class DeepQNetwork extends TemporalDifferencesLearning
         $outputs=[];
         $count = 0;
         foreach($this->replayMemory as $entry){
-            $output = [];
-            for($i=0; $i<$this->numActions; $i++){
-                $output[] = NAN;
-            }
-            $output[$entry[1]] = $entry[2];
-            $outputs[]= $output;
+            $outputs[] = [$entry[1], $entry[2]];
             $inputs[] = $entry[0];
             $count++;
             if($count >= $batchSize){
@@ -239,8 +235,12 @@ class DeepQNetwork extends TemporalDifferencesLearning
             }
         }
         $input = Matrix::quick($inputs)->transpose();
-        $this->critic->feed($input);
-        return $this->critic->backpropagate($outputs);
+        $computed = $this->critic->feed($input)->transpose()->asArray();
+        $output = $computed;
+        foreach($outputs as $idx => $e) {
+            $output[$idx][$e[0]] = $e[1];
+        }
+        return $this->critic->backpropagate($output);
     }
 
     /**
