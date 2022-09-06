@@ -133,6 +133,12 @@ class CartPole implements Environment
      */
     protected Vector $sensors;
     
+    /**
+     * Number of steps taken so far.
+     * @var int
+     */
+    protected int $steps;
+    
     
     /**
      * Create a new cart pole environment.
@@ -151,6 +157,7 @@ class CartPole implements Environment
         
         $this->angularThreshold = 12 * 2 * M_PI / 360;
         $this->spatialThreshold = 2.4;
+        $this->steps = 0;
     }
 
     /**
@@ -171,11 +178,13 @@ class CartPole implements Environment
     /**
      * Indicates the end of an episode.
      *
-     * @param ?Vector new state 
+     * @param ?Vector $sensors new state 
+     * @param ?Vector $steps new number of steps
      * @return Response
      */
-    public function reset(?Vector $sensors=null) : Response
+    public function reset(?Vector $sensors=null, ?int $steps=null) : Response
     {
+        $this->steps = $steps ?? 0;
         if($sensors) {
             $this->sensors = $sensors;
         }else{
@@ -193,6 +202,7 @@ class CartPole implements Environment
      */
     public function step(Action $action): Response
     {
+        $this->steps++;
         $force = 0.0;
         switch($action->value()) {
         case CartPole::LEFT:
@@ -277,19 +287,43 @@ class CartPole implements Environment
         $middle = $len / 2;
         $img = imagecreatetruecolor($len, $len);
 
+        // colors
         $white = imagecolorallocate($img, 255,255,255);
-        imagefilledrectangle($img, 0,0,$len,$len, $white);
-        
-        $blue = imagecolorallocate($img, 0,0,255);
+        $gray = imagecolorallocate($img, 128,128,128);
+        $blue = imagecolorallocate($img, 0,0,255);        
         $black = imagecolorallocate($img, 0,0,0);
+
+        // background
+        imagefilledrectangle($img, 0,0,$len,$len, $white);
+        imagefilledrectangle($img, 0, 505, $len, $len, $gray);
+        imagefilledrectangle($img, $middle-2, 0, $middle+2, $len, $gray);        
 
         $factor = $middle / 2.4;
         $pos = $place * $factor + $middle;
-
+        
+        // cart
         imagefilledrectangle($img, $pos-50, 400, $pos+50, 500, $blue);
+        imagefilledellipse($img, $pos-25, 500, 10,10, $black);
+        imagefilledellipse($img, $pos+25, 500, 10,10, $black);
+        // pole
         imageline($img, $pos, 400,  $pos + 200 * sin($angle), 400 - 200 * cos($angle), $black);
 
+        // texts
+        imagestring($img, 4, 10, 10, "Position:    {$this->sensors[2]}", $black);
+        imagestring($img, 4, 10, 30, "P. Velocity: {$this->sensors[3]}", $black);
+        imagestring($img, 4, 10, 50, "Angle:       {$this->sensors[0]}", $black);
+        imagestring($img, 4, 10, 70, "A. Velocity: {$this->sensors[1]}", $black);
+        imagestring($img, 4, 10, 90, "Steps:       {$this->steps}", $black);
+
         imagepng($img, $path);
+    }
+
+    /**
+     * Number of steps taken so far.
+     */
+    public function steps() : int
+    {
+        return $this->steps;
     }
 }
     
