@@ -104,7 +104,10 @@ abstract class TemporalDifferencesLearning
             $response = $env->step($nextAction);
             $maxValue = $this->maxValueAction($response->observation());
             $lr = $learningRate / (1 + $steps * $decay);
-            $newValue = $response->reward() + $this->gamma * $maxValue;
+            $newValue = $response->reward();
+            if(! $response->finished()) {
+                $newValue += $this->gamma * $maxValue;
+            }
             $this->updateValue($current, $nextAction, $lr, $newValue);
             $current = $response->observation();
             $steps++;
