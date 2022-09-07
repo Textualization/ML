@@ -123,6 +123,15 @@ class DeepQNetwork extends TemporalDifferencesLearning
     }
 
     /**
+     * Set the replay memory maximum size
+     * @param int
+     */
+    public function replayMemoryMaxSize(int $maxSize) : void
+    {
+        $this->replayMemoryMaxSize = $maxSize;
+    }
+
+    /**
      * Transform a potentially composite observation into a state number.
      *
      * @param Observation
@@ -248,5 +257,7 @@ class DeepQNetwork extends TemporalDifferencesLearning
      */
     public function adoptCritic() : void {
         $this->actor = clone $this->critic;
+        $this->replayMemory = [];
+        $this->replayMemoryLastItem = 0;
     }
 }
