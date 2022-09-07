@@ -185,7 +185,8 @@ class SimpleTrading implements Environment
             ]),
             new ObservationType(ObservationType::DISCRETE, [ 0, # under water
                                                              1  # sell for a profit
-            ])
+            ]),
+            new ObservationType(ObservationType::CONTINUOUS, [ -99999, 99999 ]) # profit percentage
         ];
         $size = 1;
         $this->windowSizes = [];
@@ -208,16 +209,22 @@ class SimpleTrading implements Environment
     protected function makeObservation() : Observation
     {
         $obs = [];
+        $profit = $this->historical[$this->time] * (1.0-$this->spread) * $this->instrument - $this->pricePaid;
         $obs[] = new SimpleObservation($this->money > 0 ? 0 : 1,
                                        $this->observationSpace->params()[0]);
-        $obs[] = new SimpleObservation($this->historical[$this->time] * (1.0-$this->spread) * $this->instrument > $this->pricePaid ? 1 : 0,
+        $obs[] = new SimpleObservation($profit > 0 ? 1 : 0,
                                        $this->observationSpace->params()[1]);
+        $obs[] = new SimpleObservation($this->pricePaid > 0 ? $profit / $this->pricePaid : 0,
+                                       $this->observationSpace->params()[1]);
+        
         $current = $this->historical[$this->time];
+        /*
         if($this->money > 0){
             $current *= 1.0 + $this->spread;
         }else{
             $current *= 1.0 - $this->spread;
         }
+        */
         $max_size = $this->windowSizes[$this->windows-1];
         $max_window = array_slice($this->historical, $this->time - $max_size, $max_size);
         for($i=0; $i<$max_size; $i++) {
@@ -234,8 +241,8 @@ class SimpleTrading implements Environment
             $avg = array_sum($prices) / $size;
             $obs[] = new SimpleObservation($min, $this->observationSpace->params()[$idx]);
             $obs[] = new SimpleObservation($max, $this->observationSpace->params()[$idx+1]);
-            $obs[] = new SimpleObservation($avg, $this->observationSpace->params()[$idx+3]);
-            $obs[] = new SimpleObservation($mean, $this->observationSpace->params()[$idx+2]);
+            $obs[] = new SimpleObservation($avg, $this->observationSpace->params()[$idx+2]);
+            $obs[] = new SimpleObservation($mean, $this->observationSpace->params()[$idx+3]);
             $idx+=4;
         }
         return new CompositeObservation($obs, $this->observationSpace);
@@ -245,14 +252,17 @@ class SimpleTrading implements Environment
      * Indicates the end of an episode.
      *
      * @param ?int new time 
+     * @param ?float new money
+     * @param ?float new instrument
+     * @param ?float new price paid
      * @return Response
      */
-    public function reset(?int $time=null) : Response
+    public function reset(?int $time=null, ?float $money=null, ?float $instrument=null, ?float $pricePaid=null) : Response
     {
         $this->time = $time ?? $this->windowSizes[$this->windows-1];
-        $this->money = $this->startingMoney;
-        $this->instrument = 0.0;
-        $this->pricePaid = 0.0;
+        $this->money = $money ?? $this->startingMoney;
+        $this->instrument = $instrument ?? 0.0;
+        $this->pricePaid = $pricePaid ?? 0.0;
         
         return new Response($this->makeObservation(), 0.0, false);
     }
@@ -280,7 +290,7 @@ class SimpleTrading implements Environment
                 if($money > $this->pricePaid) {
                     $profit = $money - $this->pricePaid;
                     $money -= $profit * $this->tax;
-                    $reward = $profit / $this->pricePaid;
+                    $reward = 1000 * (1.0 + $profit / $this->pricePaid);
                 }else{
                     $reward = -(($this->pricePaid - $money) / $this->pricePaid);
                 }
@@ -334,6 +344,37 @@ class SimpleTrading implements Environment
     }
 
     /**
+     * Current money held by the agent.
+     *
+     * @return float
+     */
+    public function money() : float
+    {
+        return $this->money;
+    }
+
+    /**
+     * Current instrument held by the agent.
+     *
+     * @return float
+     */
+    public function instrument() : float
+    {
+        return $this->instrument;
+    }
+
+    /**
+     * Price paid for the instrument held by the agent (zero if not
+     * holding any instrument at the moment).
+     *
+     * @return float
+     */
+    public function pricePaid() : float
+    {
+        return $this->pricePaid;
+    }
+
+    /**
      * What the agent is worth
      *
      * @return float
@@ -364,7 +405,6 @@ class SimpleTrading implements Environment
             file_put_contents($path, $s);
         }else{
             echo $s;
-        }
-        
+        }        
     }
 }
