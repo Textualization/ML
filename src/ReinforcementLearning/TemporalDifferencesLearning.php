@@ -2,6 +2,12 @@
 
 namespace Rubix\ML\ReinforcementLearning;
 
+use Rubix\ML\Persistable;
+use Rubix\ML\Traits\AutotrackRevisions;
+use Rubix\ML\Persisters\Persister;
+use Rubix\ML\Serializers\Serializer;
+use Rubix\ML\Serializers\RBX;
+
 /**
  * An abstract class to base Q-Learning subclasses.
  *
@@ -9,8 +15,9 @@ namespace Rubix\ML\ReinforcementLearning;
  * @package     Rubix/ML
  * @author      Pablo Duboue
  */
-abstract class TemporalDifferencesLearning
+abstract class TemporalDifferencesLearning implements Persistable
 {
+    use AutotrackRevisions;
 
     /**
      * Possible actions.
@@ -143,5 +150,29 @@ abstract class TemporalDifferencesLearning
     {
         //TODO validate
         $this->epsilon = $epsilon;
+    }
+
+    /**
+     * Persist using Rubix functionalities
+     * @param \Rubix\ML\Persisters\Persister $persister
+     * @param \Rubix\ML\Serializers\Serializer|null $serializer
+     */
+    public function save(Persister $persister, ?Serializer $serializer = null)
+    {
+        $serializer = $serializer ?? new RBX();
+        $encoding = $serializer->serialize($this);
+        $persister->save($encoding);
+    }
+    
+    /**
+     * Factory method to restore the model from persistence.
+     * @param \Rubix\ML\Persisters\Persister $persister
+     * @param \Rubix\ML\Serializers\Serializer|null $serializer
+     * @return self
+     */
+    public static function load(Persister $persister, ?Serializer $serializer = null) : self
+    {
+        $serializer = $serializer ?? new RBX();
+        return $serializer->deserialize($persister->load());
     }
 }
