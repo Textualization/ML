@@ -186,6 +186,9 @@ class SimpleTrading implements Environment
             new ObservationType(ObservationType::DISCRETE, [ 0, # under water
                                                              1  # sell for a profit
             ]),
+            new ObservationType(ObservationType::DISCRETE, [ 0, # all good
+                                                             1  # if sold, it'll go bankrupt
+            ]),
             new ObservationType(ObservationType::CONTINUOUS, [ -99999, 99999 ]) # profit percentage
         ];
         $size = 1;
@@ -209,10 +212,13 @@ class SimpleTrading implements Environment
     protected function makeObservation() : Observation
     {
         $obs = [];
-        $profit = $this->historical[$this->time] * (1.0-$this->spread) * $this->instrument - $this->pricePaid;
+        $ifSold = $this->historical[$this->time] * (1.0-$this->spread) * $this->instrument;
+        $profit = $ifSold - $this->pricePaid;
         $obs[] = new SimpleObservation($this->money > 0 ? 0 : 1,
                                        $this->observationSpace->params()[0]);
         $obs[] = new SimpleObservation($profit > 0 ? 1 : 0,
+                                       $this->observationSpace->params()[1]);
+        $obs[] = new SimpleObservation($this->instrument > 0 && $ifSold < $this->minimumTransaction ? 1 : 0,
                                        $this->observationSpace->params()[1]);
         $obs[] = new SimpleObservation($this->pricePaid > 0 ? $profit / $this->pricePaid : 0,
                                        $this->observationSpace->params()[1]);
