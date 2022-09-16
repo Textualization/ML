@@ -7,6 +7,7 @@ use Rubix\ML\NeuralNet\Network;
 use Rubix\ML\NeuralNet\FeedForward;
 use Rubix\ML\NeuralNet\Layers\Layer;
 use Rubix\ML\NeuralNet\Layers\Input;
+use Rubix\ML\NeuralNet\Layers\MultiTaskDense;
 use Rubix\ML\NeuralNet\Layers\Dense;
 use Rubix\ML\NeuralNet\Layers\Activation;
 use Rubix\ML\NeuralNet\Layers\MultiContinuous;
@@ -113,7 +114,7 @@ class DeepQNetwork extends TemporalDifferencesLearning
         $optimizer = $optimizer ?? new Adam(0.001);
         $layers = $layers ?? [ new Dense(($this->numInputs + $this->numActions) / 2),
                                new Activation(new ReLU()) ];
-        $layers[] = new Dense($this->numActions, 0.0, true, new Xavier2(), new Constant(0.1));
+        $layers[] = new MultiTaskDense($this->numActions, 0.0, true, new Xavier2(), new Constant(0.1));
         $this->actor = new Feedforward($input, $layers, $output, $optimizer);
         $this->actor->initialize();
         $this->critic = clone $this->actor;
@@ -232,24 +233,34 @@ class DeepQNetwork extends TemporalDifferencesLearning
     public function trainBatch(int $batchSize) : float
     {
         shuffle($this->replayMemory);
-        $inputs=[];
-        $outputs=[];
+        // split the batch per action
+        $actionBatch = [];
         $count = 0;
         foreach($this->replayMemory as $entry){
-            $outputs[] = [$entry[1], $entry[2]];
-            $inputs[] = $entry[0];
+            [ $inputL, $act, $targetQ ] = $entry;
+            if(! isset($actionBatch[$act])) {
+                $actionBatch[$act] = [ 'inputs' => [], 'outputs' => [] ];
+            }
+            $actionBatch[$act]['inputs'][]  = $inputL;
+            $actionBatch[$act]['outputs'][] = [ $targetQ ];
             $count++;
             if($count >= $batchSize){
                 break;
             }
         }
-        $input = Matrix::quick($inputs)->transpose();
-        $computed = $this->critic->feed($input)->transpose()->asArray();
-        $output = $computed;
-        foreach($outputs as $idx => $e) {
-            $output[$idx][$e[0]] = $e[1];
+        $result = 0;
+        foreach($actionBatch as $action => $data) {
+            $inputs  = $data['inputs'];
+            $outputs = $data['outputs'];
+            //echo "A$action, #".count($inputs)."\n";
+            $input = Matrix::quick($inputs)->transpose();
+            $layers = iterator_to_array($this->critic->layers(), false);
+            $layers[count($layers)-2]->singleOutput($action);
+            $this->critic->feed($input);
+            $result += $this->critic->backpropagate($outputs);
+            $layers[count($layers)-2]->singleOutput(null);
         }
-        return $this->critic->backpropagate($output);
+        return $result;
     }
 
     /**
@@ -257,6 +268,7 @@ class DeepQNetwork extends TemporalDifferencesLearning
      */
     public function adoptCritic() : void {
         $this->actor = clone $this->critic;
+        $layers = iterator_to_array($this->actor->layers(), false);
         $this->replayMemory = [];
         $this->replayMemoryLastItem = 0;
     }

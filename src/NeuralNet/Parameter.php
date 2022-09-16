@@ -39,10 +39,11 @@ class Parameter
 
     /**
      * @param \Tensor\Tensor $param
+     * @param ?int $id
      */
-    public function __construct(Tensor $param)
+    public function __construct(Tensor $param, ?int $id = null)
     {
-        $this->id = self::$counter++;
+        $this->id = $id ?? self::$counter++;
         $this->param = $param;
     }
 
